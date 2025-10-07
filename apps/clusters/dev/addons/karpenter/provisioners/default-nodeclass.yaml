@@ -1,0 +1,33 @@
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: NodeClass
+metadata:
+  name: default
+spec:
+  amiFamily: AL2023
+  role: "arn:aws:iam::<account_id_dev>:role/dev-karpenter-node"
+  tags:
+    environment: dev
+    finops_scope: spot
+    cost_center: platform-dev
+    business_unit: infrastructure
+    service: kubernetes
+    application: shared-eks
+    project: shared-infra
+    managed_by: karpenter
+    owner: platform-team
+    observability: enabled
+    Name: dev-karpenter
+    name: dev-karpenter
+    kubernetes.io/cluster/dev-eks: owned
+  subnetSelectorTerms:
+    - tags:
+        Name: dev-vpc-private*
+  securityGroupSelectorTerms:
+    - tags:
+        aws:eks:cluster-name: dev-eks
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 60Gi
+        volumeType: gp3
+        encrypted: true

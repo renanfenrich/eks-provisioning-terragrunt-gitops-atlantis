@@ -1,0 +1,99 @@
+# Atlantis Helm values (Bitbucket, ALB Ingress, IRSA disabled because the
+# service account is precreated)
+orgWhitelist: []
+# Use repo allowlist for security.
+# Example: https://bitbucket.org/<org>/*
+repoConfig: |
+  repos:
+    - id: /.*/
+      apply_requirements: [approved, mergeable]
+      workflow: terragrunt-plan-apply
+      allowed_overrides: [workflow]
+      allow_custom_workflows: true
+workflows:
+  terragrunt-plan-apply:
+    plan:
+      steps:
+        - run: terragrunt run-all init -upgrade
+        - run: terragrunt run-all plan -out tfplan -no-color
+    apply:
+      steps:
+        - run: terragrunt run-all apply -input=false -auto-approve tfplan
+
+environmentSecrets:
+  - name: ATLANTIS_REPO_ALLOWLIST
+    valueFrom:
+      secretKeyRef:
+        name: atlantis-secrets
+        key: REPO_ALLOWLIST
+  - name: ATLANTIS_BITBUCKET_USER
+    valueFrom:
+      secretKeyRef:
+        name: atlantis-secrets
+        key: BITBUCKET_USERNAME
+  - name: ATLANTIS_BITBUCKET_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: atlantis-secrets
+        key: BITBUCKET_TOKEN
+  - name: ATLANTIS_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: atlantis-secrets
+        key: WEBHOOK_SECRET
+
+vcsSecretName: atlantis-secrets
+bitbucket:
+  user: ""
+  token: ""
+
+serviceAccount:
+  create: false
+  name: atlantis
+
+podSecurityContext:
+  fsGroup: 2000
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+image:
+  repository: ghcr.io/runatlantis/atlantis
+  tag: v0.28.4   # pinned
+
+imagePullPolicy: IfNotPresent
+
+extraEnv:
+  - name: ATLANTIS_LOG_LEVEL
+    value: info
+  - name: ATLANTIS_ATLANTIS_URL
+    value: "https://atlantis.dev.<domain>"
+
+# Mount a PVC for Atlantis data (optional)
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClassName: gp2
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/group.name: "public"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  hosts:
+    - host: atlantis.dev.<domain>
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: atlantis-tls
+      hosts: ["atlantis.dev.<domain>"]

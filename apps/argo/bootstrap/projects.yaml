@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Platform add-ons and cluster services
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+  sourceRepos:
+    - https://github.com/<org>/apps.git
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: tenants
+  namespace: argocd
+spec:
+  description: Business and platform tenants
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+  sourceRepos:
+    - https://github.com/<org>/apps.git
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

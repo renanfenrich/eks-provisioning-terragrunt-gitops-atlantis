@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: adot-collector
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: 0.96.0
+    helm:
+      values: |
+        mode: deployment
+        presets:
+          logsCollection:
+            enabled: true
+        config:
+          receivers:
+            otlp:
+              protocols:
+                http: {}
+                grpc: {}
+          processors:
+            batch: {}
+          exporters:
+            logging: {}
+          service:
+            pipelines:
+              logs:
+                receivers: [otlp]
+                processors: [batch]
+                exporters: [logging]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: adot-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

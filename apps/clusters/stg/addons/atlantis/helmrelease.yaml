@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: atlantis
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://runatlantis.github.io/helm-charts
+    chart: atlantis
+    targetRevision: 5.3.0
+    helm:
+      valueFiles: []
+      values: |
+        {{- file "clusters/stg/addons/atlantis/values.yaml" | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: atlantis
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,19 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-seccomp
+spec:
+  validationFailureAction: audit
+  rules:
+    - name: require-seccomp-all
+      match:
+        resources:
+          kinds:
+            - Pod
+      validate:
+        message: "Pods must set seccompProfile to RuntimeDefault"
+        pattern:
+          spec:
+            securityContext:
+              seccompProfile:
+                type: RuntimeDefault

@@ -1,0 +1,50 @@
+# Terragrunt / Terraform state and cache
+.terragrunt-cache/
+.terragrunt/
+.terraform/
+**/.terraform/*
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.*
+terraform.tfstate.d/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.plan
+crash.log
+crash.*.log
+
+# Terragrunt generated files
+backend.tf
+providers.tf
+*.auto.tfvars
+*.auto.tfvars.json
+terragrunt-debug.tfvars.json
+
+# Local secrets and overrides
+*.tfvars
+*.tfvars.json
+*.override.tf
+*.override.tf.json
+
+# Dependency directories
+node_modules/
+vendor/
+
+# Kubernetes / tooling artifacts
+kubeconfig
+kubeconfig-*
+*.kubeconfig
+
+# Python virtualenvs
+.venv/
+__pycache__/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig

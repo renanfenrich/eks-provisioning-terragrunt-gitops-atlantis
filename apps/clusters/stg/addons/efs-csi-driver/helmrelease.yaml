@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: efs-csi-driver
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://kubernetes-sigs.github.io/aws-efs-csi-driver
+    chart: aws-efs-csi-driver
+    targetRevision: 2.6.7
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

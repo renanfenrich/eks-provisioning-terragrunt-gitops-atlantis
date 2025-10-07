@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: karpenter
+  namespace: karpenter
+  annotations:
+    eks.amazonaws.com/role-arn: "<karpenter_controller_role_arn>"

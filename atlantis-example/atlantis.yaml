@@ -1,0 +1,23 @@
+version: 3
+projects:
+  - name: dev-eks
+    dir: live/dev/us-east-1
+    autoplan:
+      when_modified: ["**/*.hcl"]
+      enabled: true
+    workflow: terragrunt
+  - name: stg-eks
+    dir: live/stg/us-east-1
+    autoplan:
+      when_modified: ["**/*.hcl"]
+      enabled: true
+    workflow: terragrunt
+workflows:
+  terragrunt:
+    plan:
+      steps:
+        - run: terragrunt run-all init -upgrade
+        - run: terragrunt run-all plan -out tfplan -no-color
+    apply:
+      steps:
+        - run: terragrunt run-all apply -input=false -auto-approve tfplan

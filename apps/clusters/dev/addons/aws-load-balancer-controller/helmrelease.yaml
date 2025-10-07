@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 1.8.1
+    helm:
+      valueFiles: []
+      values: |
+        {{- file "clusters/dev/addons/aws-load-balancer-controller/values.yaml"
+            | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: alb-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

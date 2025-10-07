@@ -1,0 +1,8 @@
+clusterName: stg-eks
+region: us-east-1
+vpcId: ""
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: "<alb_controller_role_arn>"

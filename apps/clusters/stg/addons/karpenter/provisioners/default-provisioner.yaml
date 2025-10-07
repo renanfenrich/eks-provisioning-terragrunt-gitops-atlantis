@@ -1,0 +1,29 @@
+apiVersion: karpenter.sh/v1beta1
+kind: Provisioner
+metadata:
+  name: default
+spec:
+  consolidation:
+    enabled: true
+  ttlSecondsAfterEmpty: 60
+  limits:
+    resources:
+      cpu: 200
+  providerRef:
+    name: default
+  requirements:
+    - key: karpenter.k8s.aws/instance-family
+      operator: In
+      values:
+        - m6i
+        - c6i
+        - r6i
+    - key: karpenter.k8s.aws/capacity-type
+      operator: In
+      values:
+        - spot
+        - on-demand
+  taints:
+    - key: "workload"
+      value: "apps"
+      effect: NoSchedule
