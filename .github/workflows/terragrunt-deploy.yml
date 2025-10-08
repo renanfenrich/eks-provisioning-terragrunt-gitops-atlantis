@@ -75,6 +75,11 @@ jobs:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terraform_wrapper: false
 
+      - name: Capture Terraform binary path
+        run: |
+          set -euo pipefail
+          echo "TERRAFORM_BIN=$(command -v terraform)" >> "$GITHUB_ENV"
+
       - name: Cache Terraform and Terragrunt artifacts
         uses: actions/cache@v4
         with:
@@ -91,6 +96,7 @@ jobs:
         uses: gruntwork-io/terragrunt-action@v3
         with:
           tg_version: ${{ env.TERRAGRUNT_VERSION }}
+          tf_path: ${{ env.TERRAFORM_BIN }}
 
       - name: Detect AWS credential configuration
         id: detect-aws-credentials
