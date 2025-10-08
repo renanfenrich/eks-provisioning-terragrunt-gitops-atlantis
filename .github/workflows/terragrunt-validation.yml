@@ -58,11 +58,10 @@ jobs:
       - name: Terraform fmt check
         run: terraform fmt -check -recursive
 
-      - name: Terragrunt hclfmt check
+      - name: Terragrunt format check
         run: |
           set -euo pipefail
-          terragrunt hclfmt --terragrunt-non-interactive
-          git diff --exit-code
+          terragrunt hcl format --non-interactive --check --diff
 
   unit-tests:
     name: Terragrunt Config Tests
