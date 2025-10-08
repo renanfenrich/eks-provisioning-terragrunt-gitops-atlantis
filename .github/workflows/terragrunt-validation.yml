@@ -169,18 +169,26 @@ jobs:
     name: Policy checks
     runs-on: ubuntu-latest
     needs: validate
-    env:
-      POLICY_HASH: ${{ hashFiles('policy/**/*.rego') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Detect Rego policies
+        id: rego-detect
+        run: |
+          set -euo pipefail
+          if compgen -G "policy/**/*.rego" > /dev/null 2>&1; then
+            echo "has_rego=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_rego=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Skip if no Rego policies
-        if: env.POLICY_HASH == ''
+        if: ${{ steps.rego-detect.outputs.has_rego == 'false' }}
         run: echo "No policy directory detected — skipping policy enforcement."
 
       - name: Install OPA
-        if: env.POLICY_HASH != ''
+        if: ${{ steps.rego-detect.outputs.has_rego == 'true' }}
         run: |
           set -euo pipefail
           curl -sL -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
@@ -188,5 +196,5 @@ jobs:
           opa version
 
       - name: Run policy unit tests
-        if: env.POLICY_HASH != ''
+        if: ${{ steps.rego-detect.outputs.has_rego == 'true' }}
         run: opa test policy

@@ -92,20 +92,52 @@ jobs:
         with:
           tg_version: ${{ env.TERRAGRUNT_VERSION }}
 
+      - name: Detect AWS credential configuration
+        id: detect-aws-credentials
+        env:
+          ROLE_SECRET: ${{ secrets.aws_role_to_assume }}
+          ROLE_VAR: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          ACCESS_KEY_ID: ${{ secrets.aws_access_key_id }}
+          SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
+          SESSION_TOKEN: ${{ secrets.aws_session_token }}
+        run: |
+          set -euo pipefail
+          mode="none"
+          role="${ROLE_SECRET:-}"
+          if [ -z "$role" ] && [ -n "${ROLE_VAR:-}" ]; then
+            role="${ROLE_VAR}"
+          fi
+          if [ -n "$role" ]; then
+            mode="oidc"
+            {
+              echo "AWS_ROLE_TO_ASSUME=$role"
+            } >> "$GITHUB_ENV"
+          elif [ -n "${ACCESS_KEY_ID:-}" ] && [ -n "${SECRET_ACCESS_KEY:-}" ]; then
+            mode="static"
+            {
+              echo "AWS_ACCESS_KEY_ID=${ACCESS_KEY_ID}"
+              echo "AWS_SECRET_ACCESS_KEY=${SECRET_ACCESS_KEY}"
+              if [ -n "${SESSION_TOKEN:-}" ]; then
+                echo "AWS_SESSION_TOKEN=${SESSION_TOKEN}"
+              fi
+            } >> "$GITHUB_ENV"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS credentials (OIDC role)
-        if: ${{ secrets.aws_role_to_assume != '' || vars.AWS_ROLE_TO_ASSUME != '' }}
+        if: ${{ steps.detect-aws-credentials.outputs.mode == 'oidc' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.aws_role_to_assume != '' && secrets.aws_role_to_assume || vars.AWS_ROLE_TO_ASSUME }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Configure AWS credentials (static keys)
-        if: ${{ secrets.aws_role_to_assume == '' && secrets.aws_access_key_id != '' && secrets.aws_secret_access_key != '' }}
+        if: ${{ steps.detect-aws-credentials.outputs.mode == 'static' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.aws_access_key_id }}
-          aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
-          aws-session-token: ${{ secrets.aws_session_token }}
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Terragrunt run-all ${{ inputs.command }}
