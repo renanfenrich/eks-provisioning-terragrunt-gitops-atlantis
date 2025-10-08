@@ -1,5 +1,5 @@
 locals {
-  root_config    = read_terragrunt_config(find_in_parent_folders("terragrunt.hcl"))
+  root_config    = read_terragrunt_config(find_in_parent_folders("root.hcl"))
   account_config = read_terragrunt_config("${get_terragrunt_dir()}/account.hcl")
   env            = local.account_config.locals.env
   region         = local.account_config.locals.region
