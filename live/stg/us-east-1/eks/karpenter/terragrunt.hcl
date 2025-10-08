@@ -20,13 +20,12 @@ terraform {
 locals {
   env          = include.region.locals.env
   default_tags = include.region.locals.tags
-  cluster_name = dependency.eks.outputs.cluster_name
   name         = "${local.env}-karpenter"
 }
 
 inputs = {
   create                           = true
-  cluster_name                     = local.cluster_name
+  cluster_name                     = dependency.eks.outputs.cluster_name
   irsa_oidc_provider_arn           = dependency.eks.outputs.oidc_provider_arn
   enable_spot_interruption_handler = true
   interruption_handling            = { enable_queue = true }
