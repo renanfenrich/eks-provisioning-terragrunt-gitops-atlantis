@@ -14,8 +14,8 @@ but uses production-like account guardrails, IAM policies, and chart versions.
 1. Authenticate to the staging AWS account.
 2. From `live/stg/us-east-1/network/vpc`, run:
    ```bash
-   terragrunt run-all plan
-   terragrunt run-all apply
+   terragrunt plan --all
+   terragrunt apply --all
    ```
 3. From `live/stg/us-east-1/eks/cluster`, run `terragrunt apply`.
 4. From `live/stg/us-east-1/eks/karpenter`, run `terragrunt apply`.

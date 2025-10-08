@@ -34,7 +34,7 @@ integration.
 
 ### Bootstrap order (dev)
 ```bash
-cd live/dev/us-east-1/network/vpc        && terragrunt run-all apply
+cd live/dev/us-east-1/network/vpc        && terragrunt apply --all
 cd live/dev/us-east-1/eks/cluster        && terragrunt apply
 cd live/dev/us-east-1/eks/karpenter      && terragrunt apply
 cd live/dev/us-east-1/iam/atlantis       && terragrunt apply
@@ -43,7 +43,7 @@ cd live/dev/us-east-1/iam/terraform-exec && terragrunt apply
 
 ### Bootstrap order (stg)
 ```bash
-cd live/stg/us-east-1/network/vpc        && terragrunt run-all apply
+cd live/stg/us-east-1/network/vpc        && terragrunt apply --all
 cd live/stg/us-east-1/eks/cluster        && terragrunt apply
 cd live/stg/us-east-1/eks/karpenter      && terragrunt apply
 cd live/stg/us-east-1/iam/atlantis       && terragrunt apply
@@ -51,7 +51,7 @@ cd live/stg/us-east-1/iam/terraform-exec && terragrunt apply
 ```
 
 ### Validating deployments
-1. Run `terragrunt run-all plan` from the environment root (`live/dev/us-east-1`
+1. Run `terragrunt plan --all` from the environment root (`live/dev/us-east-1`
    or `live/stg/us-east-1`) before applying to catch drifts.
 2. After each apply, reconcile the GitOps repo (see `apps/README.md`) so Argo CD
    installs the controllers using the IAM roles you just created.
@@ -62,7 +62,7 @@ cd live/stg/us-east-1/iam/terraform-exec && terragrunt apply
 ## Directory structure
 ```
 live/
-  terragrunt.hcl             # root configuration and provider defaults
+  root.hcl                   # root configuration and provider defaults
   dev/                       # development environment
     account.hcl              # account ID, region, domain inputs
     _env.hcl                 # remote state + provider tagging
@@ -76,6 +76,6 @@ live/
 ```
 
 ## Tips
-- Keep `terragrunt.hcl` inputs in sync between dev and stg to avoid drift.
+- Keep `root.hcl` inputs in sync between dev and stg to avoid drift.
 - Run `terragrunt hclfmt` before committing.
 - When bumping module versions, update both environments and run plans in CI.

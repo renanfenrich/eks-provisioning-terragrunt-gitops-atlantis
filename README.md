@@ -31,7 +31,7 @@ Update all `<...>` placeholders before running any plans. Key values include:
 
 | Placeholder | Location | Description |
 |-------------|----------|-------------|
-| `<org>` | `live/terragrunt.hcl`, `apps/argo/bootstrap/*.yaml` | Git hosting org/user used by Argo CD |
+| `<org>` | `live/root.hcl`, `apps/argo/bootstrap/*.yaml` | Git hosting org/user used by Argo CD |
 | `<account_id_dev>`, `<account_id_stg>` | `live/*/account.hcl`, various manifests | AWS account IDs per environment |
 | `<domain>` / `<domain_if_any>` | `live/*/account.hcl`, app manifests | Base DNS domain for ingress |
 | `<route53_zone_id>` | cert-manager issuers | Route 53 hosted zone for DNS-01 challenges |
@@ -50,17 +50,17 @@ cd eks-provisioning-terragrunt-gitops-atlantis
 # 2. Fill placeholders (search for '<' and update)
 
 # 3. (Optional) Format Terragrunt files
-terragrunt hclfmt
+terragrunt hcl fmt
 
 # 4. Bootstrap dev
-cd live/dev/us-east-1/network/vpc        && terragrunt run-all apply
+cd live/dev/us-east-1/network/vpc        && terragrunt apply --all
 cd ../eks/cluster                        && terragrunt apply
 cd ../eks/karpenter                      && terragrunt apply
 cd ../../iam/atlantis                    && terragrunt apply
 cd ../terraform-exec                     && terragrunt apply
 
 # 5. Repeat for staging
-cd ../../../../stg/us-east-1/network/vpc && terragrunt run-all apply
+cd ../../../../stg/us-east-1/network/vpc && terragrunt apply --all
 # ...follow README instructions under live/stg/
 ```
 
@@ -69,7 +69,7 @@ the Argo CD bootstrap manifests under `apps/argo/bootstrap/`. Argo CD will sync
 the controller add-ons and the sample application automatically.
 
 ## GitOps workflow
-1. Infra changes: update HCL under `live/`, run `terragrunt run-all plan`, and
+1. Infra changes: update HCL under `live/`, run `terragrunt plan --all`, and
    apply through Atlantis or the CLI.
 2. Platform add-ons: edit Kustomize overlays in `apps/clusters/<env>` and let
    Argo CD reconcile the cluster.
@@ -78,8 +78,8 @@ the controller add-ons and the sample application automatically.
 
 ## Atlantis integration
 The `atlantis-example/atlantis.yaml` file registers the `dev` and `stg`
-Terragrunt stacks and defines a reusable workflow that runs `terragrunt run-all
-init/plan/apply`. Update repo allowlists, credentials, and any custom workflows
+Terragrunt stacks and defines a reusable workflow that runs `terragrunt init --all`,
+`terragrunt plan --all`, and `terragrunt apply --all`. Update repo allowlists, credentials, and any custom workflows
 before deploying Atlantis (see `apps/clusters/*/addons/atlantis`).
 
 ## Repository structure
@@ -93,7 +93,7 @@ before deploying Atlantis (see `apps/clusters/*/addons/atlantis`).
 
 ## Recommended checks
 - `terragrunt hclfmt` — format configuration before committing.
-- `terragrunt run-all plan` — run from the environment root to ensure a clean
+- `terragrunt plan --all` — run from the environment root to ensure a clean
   plan.
 - `kubectl get applications.argoproj.io -n argocd` — verify Argo CD sync health.
 - `aws sts get-caller-identity` — confirm AWS credentials target the expected
@@ -102,8 +102,8 @@ before deploying Atlantis (see `apps/clusters/*/addons/atlantis`).
 ## Continuous integration
 GitHub Actions under `.github/workflows/terragrunt-validation.yml` install
 Terragrunt via `gruntwork-io/terragrunt-action`, cache Terraform plugins and
-modules, and fan out `terragrunt run-all init/validate/validate-inputs` across
-each environment with the state backend disabled. Downstream jobs publish SARIF
+modules, and fan out `terragrunt init --all`, `terragrunt validate --all`, and `terragrunt validate-inputs --all`
+across each environment with the state backend disabled. Downstream jobs publish SARIF
 results from `bridgecrewio/checkov-action@v12` scans and, when `policy/*.rego` is present, execute OPA
 unit tests. Runs short-circuit when a newer commit arrives thanks to workflow
 concurrency, and you can opt into OIDC-authenticated AWS plans by setting
@@ -111,8 +111,8 @@ concurrency, and you can opt into OIDC-authenticated AWS plans by setting
 
 ### Reusable deploy workflow
 `.github/workflows/terragrunt-deploy.yml` exposes a reusable `workflow_call`
-interface so other repos (or additional pipelines here) can run `terragrunt
-run-all` commands without duplicating setup logic. Example usage:
+interface so other repos (or additional pipelines here) can run `terragrunt <command> --all`
+invocations without duplicating setup logic. Example usage:
 
 ```yaml
 jobs:
@@ -129,7 +129,7 @@ keys to authenticate. Toggle `include_external_dependencies`/`ignore_external_de
 and `extra_args` to adjust the Terragrunt invocation.
 
 ### Plans on pull requests
-`terragrunt-plan.yml` reuses the deploy workflow to run `terragrunt run-all plan`
+`terragrunt-plan.yml` reuses the deploy workflow to run `terragrunt plan --all`
 for both `live/dev` and `live/stg` whenever Terraform HCL changes land in a PR
 or when triggered manually. Ensure either the repository variable
 `AWS_ROLE_TO_ASSUME` or the secret `aws_role_to_assume` (plus optional static AWS
