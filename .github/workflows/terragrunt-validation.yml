@@ -95,6 +95,7 @@ jobs:
       TF_CLI_ARGS_init: -backend=false
       TG_LOG: error
       AWS_DEFAULT_REGION: us-east-1
+      TG_REMOTE_STATE_SKIP: "true"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
