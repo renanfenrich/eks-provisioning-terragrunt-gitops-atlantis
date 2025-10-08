@@ -1,0 +1,135 @@
+name: Terragrunt Deploy
+
+on:
+  workflow_call:
+    inputs:
+      working_dir:
+        required: true
+        type: string
+        description: "Relative path to the Terragrunt stack root (e.g. live/dev)"
+      command:
+        required: false
+        type: string
+        default: "plan"
+        description: "Terragrunt command to execute via run-all (plan/apply/output/...)"
+      terraform_version:
+        required: false
+        type: string
+        default: "1.6.6"
+      terragrunt_version:
+        required: false
+        type: string
+        default: "0.82.3"
+      aws_region:
+        required: false
+        type: string
+        default: "us-east-1"
+      ignore_external_dependencies:
+        required: false
+        type: boolean
+        default: true
+        description: "Append --terragrunt-ignore-external-dependencies when true"
+      include_external_dependencies:
+        required: false
+        type: boolean
+        default: false
+        description: "Append --terragrunt-include-external-dependencies when true"
+      extra_args:
+        required: false
+        type: string
+        default: ""
+        description: "Additional CLI arguments appended to the terragrunt run-all invocation"
+    secrets:
+      aws_role_to_assume:
+        required: false
+      aws_access_key_id:
+        required: false
+      aws_secret_access_key:
+        required: false
+      aws_session_token:
+        required: false
+
+concurrency:
+  group: terragrunt-deploy-${{ github.workflow }}-${{ github.ref }}-${{ inputs.working_dir }}-${{ inputs.command }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run:
+    name: terragrunt run-all ${{ inputs.command }}
+    runs-on: ubuntu-latest
+    env:
+      TERRAFORM_VERSION: ${{ inputs.terraform_version }}
+      TERRAGRUNT_VERSION: ${{ inputs.terragrunt_version }}
+      AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Cache Terraform and Terragrunt artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            .terragrunt-cache
+            **/.terraform
+          key: terragrunt-deploy-${{ runner.os }}-${{ inputs.working_dir }}-${{ inputs.command }}-${{ hashFiles('**/*.hcl', '**/*.tf') }}
+          restore-keys: |
+            terragrunt-deploy-${{ runner.os }}-${{ inputs.working_dir }}-
+            terragrunt-deploy-${{ runner.os }}-
+
+      - name: Install Terragrunt
+        uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Configure AWS credentials (OIDC role)
+        if: ${{ secrets.aws_role_to_assume != '' || vars.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.aws_role_to_assume != '' && secrets.aws_role_to_assume || vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Configure AWS credentials (static keys)
+        if: ${{ secrets.aws_role_to_assume == '' && secrets.aws_access_key_id != '' && secrets.aws_secret_access_key != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.aws_access_key_id }}
+          aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
+          aws-session-token: ${{ secrets.aws_session_token }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Terragrunt run-all ${{ inputs.command }}
+        env:
+          WORKING_DIR: ${{ inputs.working_dir }}
+          COMMAND: ${{ inputs.command }}
+          IGNORE_EXTERNAL_DEPENDENCIES: ${{ inputs.ignore_external_dependencies }}
+          INCLUDE_EXTERNAL_DEPENDENCIES: ${{ inputs.include_external_dependencies }}
+          EXTRA_ARGS: ${{ inputs.extra_args }}
+        run: |
+          set -euo pipefail
+          cd "${WORKING_DIR}"
+          flags=(--terragrunt-non-interactive)
+          if [ "${INCLUDE_EXTERNAL_DEPENDENCIES}" = "true" ]; then
+            flags+=(--terragrunt-include-external-dependencies)
+          elif [ "${IGNORE_EXTERNAL_DEPENDENCIES}" = "true" ]; then
+            flags+=(--terragrunt-ignore-external-dependencies)
+          fi
+          if [ -n "${EXTRA_ARGS}" ]; then
+            # shellcheck disable=SC2206
+            extra=( ${EXTRA_ARGS} )
+          else
+            extra=()
+          fi
+          echo "::group::terragrunt run-all ${COMMAND}"
+          terragrunt run-all "${COMMAND}" "${flags[@]}" "${extra[@]}"
+          echo "::endgroup::"

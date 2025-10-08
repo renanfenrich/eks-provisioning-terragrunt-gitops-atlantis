@@ -1,0 +1,39 @@
+name: Terragrunt Plan
+
+on:
+  pull_request:
+    paths:
+      - "live/**"
+      - ".github/workflows/terragrunt-deploy.yml"
+      - ".github/workflows/terragrunt-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terragrunt-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan-dev:
+    name: Plan dev
+    uses: ./.github/workflows/terragrunt-deploy.yml
+    with:
+      working_dir: live/dev
+      command: plan
+      ignore_external_dependencies: true
+      include_external_dependencies: false
+    secrets: inherit
+
+  plan-stg:
+    name: Plan stg
+    needs: plan-dev
+    uses: ./.github/workflows/terragrunt-deploy.yml
+    with:
+      working_dir: live/stg
+      command: plan
+      ignore_external_dependencies: true
+      include_external_dependencies: false
+    secrets: inherit

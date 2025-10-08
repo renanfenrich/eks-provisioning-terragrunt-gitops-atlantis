@@ -1,0 +1,192 @@
+name: Terragrunt Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: terragrunt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TERRAFORM_VERSION: 1.6.6
+  TERRAGRUNT_VERSION: 0.82.3
+
+jobs:
+  format:
+    name: Format and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Cache Terraform and Terragrunt artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            .terragrunt-cache
+            **/.terraform
+          key: terragrunt-${{ runner.os }}-${{ hashFiles('**/*.hcl', '**/*.tf') }}
+          restore-keys: |
+            terragrunt-${{ runner.os }}-
+
+      - name: Install Terragrunt
+        uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: Terragrunt hclfmt check
+        run: |
+          set -euo pipefail
+          terragrunt hclfmt --terragrunt-non-interactive
+          git diff --exit-code
+
+  validate:
+    name: Validate Terragrunt stacks
+    runs-on: ubuntu-latest
+    needs: format
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, stg]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_INPUT: "0"
+      TF_CLI_ARGS_init: -backend=false
+      TG_LOG: error
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Cache Terraform and Terragrunt artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            .terragrunt-cache
+            **/.terraform
+          key: terragrunt-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('**/*.hcl', '**/*.tf') }}
+          restore-keys: |
+            terragrunt-${{ runner.os }}-${{ matrix.environment }}-
+            terragrunt-${{ runner.os }}-
+
+      - name: Install Terragrunt
+        uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        if: vars.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Validate ${{ matrix.environment }} stacks
+        env:
+          TERRAGRUNT_WORKING_DIR: live/${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          echo "::group::terragrunt run-all init (${{ matrix.environment }})"
+          terragrunt run-all init \
+            --terragrunt-non-interactive \
+            --terragrunt-working-dir "${TERRAGRUNT_WORKING_DIR}" \
+            --terragrunt-ignore-external-dependencies
+          echo "::endgroup::"
+
+          echo "::group::terragrunt run-all validate (${{ matrix.environment }})"
+          terragrunt run-all validate \
+            --terragrunt-non-interactive \
+            --terragrunt-working-dir "${TERRAGRUNT_WORKING_DIR}" \
+            --terragrunt-ignore-external-dependencies
+          echo "::endgroup::"
+
+          echo "::group::terragrunt run-all validate-inputs (${{ matrix.environment }})"
+          terragrunt run-all validate-inputs \
+            --terragrunt-non-interactive \
+            --terragrunt-working-dir "${TERRAGRUNT_WORKING_DIR}" \
+            --terragrunt-ignore-external-dependencies
+          echo "::endgroup::"
+
+  security:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    needs: validate
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    env:
+      CHECKOV_OUTPUT: reports/checkov.sarif
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Prepare report directory
+        run: mkdir -p reports
+
+      - name: Run Checkov (Terraform & Terragrunt)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: live
+          framework: terraform,terragrunt
+          output_format: cli,sarif
+          output_file_path: console,${{ env.CHECKOV_OUTPUT }}
+          download_external_modules: true
+          quiet: true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: ${{ env.CHECKOV_OUTPUT }}
+
+  policy:
+    name: Policy checks
+    runs-on: ubuntu-latest
+    needs: validate
+    env:
+      POLICY_HASH: ${{ hashFiles('policy/**/*.rego') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Skip if no Rego policies
+        if: env.POLICY_HASH == ''
+        run: echo "No policy directory detected — skipping policy enforcement."
+
+      - name: Install OPA
+        if: env.POLICY_HASH != ''
+        run: |
+          set -euo pipefail
+          curl -sL -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          install -m 0755 opa /usr/local/bin/opa
+          opa version
+
+      - name: Run policy unit tests
+        if: env.POLICY_HASH != ''
+        run: opa test policy

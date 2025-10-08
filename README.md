@@ -14,17 +14,17 @@ to end.
   Karpenter, ADOT, CSI drivers, etc.) and a sample workload.
 - `atlantis-example/` — Reference `atlantis.yaml` workflows that run Terragrunt
   plans/applies in PRs.
-- `.gitignore` — Optimised for Terraform/Terragrunt state, generated files, and
+- `.gitignore` — Optimized for Terraform/Terragrunt state, generated files, and
   common local artifacts.
 
 ## Prerequisites
 - AWS accounts for `dev` and `stg`, with IAM permissions to provision VPC, EKS,
-  IAM roles, Route53, KMS, etc.
-- Terraform ≥ 1.6, Terragrunt ≥ 0.58, kubectl, awscli, and (optionally) Argo CD
-  CLI.
-- Remote state S3 bucket(s) and DynamoDB table(s) for state locking (create
-  beforehand).
-- DNS zone in Route53 if you plan to issue certificates via cert-manager.
+  IAM roles, Route 53, KMS, etc.
+- Terraform ≥ 1.6, Terragrunt ≥ 0.58, kubectl, AWS CLI, and (optionally) the
+  Argo CD CLI.
+- Remote state S3 bucket(s); add DynamoDB table(s) if you plan to enable state
+  locking.
+- DNS zone in Route 53 if you plan to issue certificates via cert-manager.
 
 ## Replace placeholders
 Update all `<...>` placeholders before running any plans. Key values include:
@@ -34,7 +34,7 @@ Update all `<...>` placeholders before running any plans. Key values include:
 | `<org>` | `live/terragrunt.hcl`, `apps/argo/bootstrap/*.yaml` | Git hosting org/user used by Argo CD |
 | `<account_id_dev>`, `<account_id_stg>` | `live/*/account.hcl`, various manifests | AWS account IDs per environment |
 | `<domain>` / `<domain_if_any>` | `live/*/account.hcl`, app manifests | Base DNS domain for ingress |
-| `<route53_zone_id>` | cert-manager issuers | Hosted zone for DNS-01 challenges |
+| `<route53_zone_id>` | cert-manager issuers | Route 53 hosted zone for DNS-01 challenges |
 | `<state_bucket>` / `<state_bucket_stg>` | `_env.hcl` files | Remote state S3 bucket names |
 | `<kms_key_arn>` / `<kms_key_arn_stg>` | `_env.hcl` files | KMS key ARN used to encrypt state |
 | `<alb_controller_role_arn>`, `<external_secrets_role_arn>`, `<karpenter_controller_role_arn>` | Add-on service accounts | IRSA role ARNs created by Terraform |
@@ -99,7 +99,47 @@ before deploying Atlantis (see `apps/clusters/*/addons/atlantis`).
 - `aws sts get-caller-identity` — confirm AWS credentials target the expected
   account before applying.
 
+## Continuous integration
+GitHub Actions under `.github/workflows/terragrunt-validation.yml` install
+Terragrunt via `gruntwork-io/terragrunt-action`, cache Terraform plugins and
+modules, and fan out `terragrunt run-all init/validate/validate-inputs` across
+each environment with the state backend disabled. Downstream jobs publish SARIF
+results from `bridgecrewio/checkov-action@v12` scans and, when `policy/*.rego` is present, execute OPA
+unit tests. Runs short-circuit when a newer commit arrives thanks to workflow
+concurrency, and you can opt into OIDC-authenticated AWS plans by setting
+`AWS_ROLE_TO_ASSUME` as an org/repo variable.
+
+### Reusable deploy workflow
+`.github/workflows/terragrunt-deploy.yml` exposes a reusable `workflow_call`
+interface so other repos (or additional pipelines here) can run `terragrunt
+run-all` commands without duplicating setup logic. Example usage:
+
+```yaml
+jobs:
+  plan-dev:
+    uses: ./.github/workflows/terragrunt-deploy.yml
+    with:
+      working_dir: live/dev
+      command: plan
+    secrets: inherit
+```
+
+Pass `secrets.aws_role_to_assume` (preferred, via GitHub OIDC) or static AWS
+keys to authenticate. Toggle `include_external_dependencies`/`ignore_external_dependencies`
+and `extra_args` to adjust the Terragrunt invocation.
+
+### Plans on pull requests
+`terragrunt-plan.yml` reuses the deploy workflow to run `terragrunt run-all plan`
+for both `live/dev` and `live/stg` whenever Terraform HCL changes land in a PR
+or when triggered manually. Ensure either the repository variable
+`AWS_ROLE_TO_ASSUME` or the secret `aws_role_to_assume` (plus optional static AWS
+keys) is defined so the reusable workflow can assume credentials.
+
+### Policy guardrails
+OPA policies live under `policy/`. The provided `terraform/state.rego` rules and
+tests enforce that any S3 remote state backend enables `encrypt = true` and
+specifies a KMS key—mirroring the guardrails executed during the `policy` job in
+the validation workflow. Extend these policies as your compliance surface grows.
+
 ## License
-Choose an open-source license before publishing (Apache License 2.0 is a
-popular option for Terraform/Terragrunt projects). Add it as `LICENSE` at the
-repository root.
+Licensed under the [Apache License 2.0](LICENSE).
