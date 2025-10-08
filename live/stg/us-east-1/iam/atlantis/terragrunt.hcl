@@ -22,8 +22,6 @@ locals {
   default_tags = include.region.locals.tags
   aws_account  = include.region.locals.aws_account
   name         = "${local.env}-atlantis"
-  oidc_issuer  = dependency.eks.outputs.cluster_oidc_issuer_url
-  oidc_host    = replace(local.oidc_issuer, "https://", "")
 }
 
 # Atlantis IRSA role for staging deployments. Limited to assume execution roles in the staging account.
@@ -39,8 +37,8 @@ inputs = {
     }]
     condition = {
       StringEquals = {
-        "${local.oidc_host}:sub" = "system:serviceaccount:atlantis:atlantis"
-        "${local.oidc_host}:aud" = "sts.amazonaws.com"
+        "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:atlantis:atlantis"
+        "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
       }
     }
   }]
