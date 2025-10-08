@@ -68,7 +68,7 @@ inputs = {
     }
   ]
   authentication_mode = "API_AND_CONFIG_MAP"
-  tags                = merge(local.default_tags, {
+  tags = merge(local.default_tags, {
     Name = local.name
     name = local.name
   })

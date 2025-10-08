@@ -1,8 +1,8 @@
-terraform_version_constraint = ">= 1.6.0"
+terraform_version_constraint  = ">= 1.6.0"
 terragrunt_version_constraint = ">= 0.58.0"
 
 locals {
-  org       = "<org>"
+  org = "<org>"
   common_tags = {
     owner               = local.org
     managed_by          = "terragrunt"

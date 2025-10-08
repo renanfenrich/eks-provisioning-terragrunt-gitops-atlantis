@@ -57,7 +57,7 @@ inputs = {
   cluster_addons            = local.cluster_addons
   eks_managed_node_groups   = local.managed_node_groups
   cluster_enabled_log_types = local.enabled_log_types
-  tags                      = merge(local.default_tags, {
+  tags = merge(local.default_tags, {
     Name = local.name
     name = local.name
   })
