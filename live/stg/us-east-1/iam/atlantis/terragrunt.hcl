@@ -5,7 +5,7 @@ include "region" {
 
 dependency "eks" {
   config_path                             = "../../eks/cluster"
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
   mock_outputs = {
     cluster_name            = "stg-eks"
     cluster_oidc_issuer_url = "https://oidc.eks.us-east-1.amazonaws.com/id/STGOIDC"

@@ -4,7 +4,7 @@ include "region" {
 }
 dependency "eks" {
   config_path                             = "../cluster"
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
   mock_outputs = {
     cluster_name      = "dev-eks"
     oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/ABC"

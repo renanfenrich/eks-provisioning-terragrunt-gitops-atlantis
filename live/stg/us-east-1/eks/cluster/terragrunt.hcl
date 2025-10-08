@@ -5,7 +5,7 @@ include "region" {
 
 dependency "vpc" {
   config_path                             = "../../network/vpc"
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
   mock_outputs = {
     vpc_id          = "vpc-000000"
     private_subnets = ["subnet-aaa", "subnet-bbb", "subnet-ccc"]
